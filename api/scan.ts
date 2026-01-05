@@ -1,28 +1,97 @@
-﻿import type { VercelRequest, VercelResponse } from '@vercel/node';
+﻿import type { VercelRequest, VercelResponse } from "@vercel/node";
+import crypto from "crypto";
 
-export default async function handler(
-  req: VercelRequest,
-  res: VercelResponse
-) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'POST only' });
+const LOGIN = process.env.DATAFORSEO_LOGIN || "";
+const PASSWORD = process.env.DATAFORSEO_PASSWORD || "";
+const CACHE_TTL = Number(process.env.CACHE_TTL_SECONDS || "900");
+
+const memoryCache = new Map<string, { exp: number; val: any }>();
+
+function auth() {
+  return "Basic " + Buffer.from(`${LOGIN}:${PASSWORD}`).toString("base64");
+}
+
+function key(obj: any) {
+  return crypto.createHash("sha256").update(JSON.stringify(obj)).digest("hex");
+}
+
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "POST only" });
   }
 
-  const { keyword, location } = req.body || {};
-
-  if (!keyword || !location) {
-    return res.status(400).json({ error: 'Missing keyword or location' });
+  if (!LOGIN || !PASSWORD) {
+    return res.status(500).json({ error: "Missing DataForSEO credentials" });
   }
 
-  // 🔒 PLACEHOLDER — LIVE DATA WILL PLUG HERE
-  return res.status(200).json({
-    keyword,
-    location,
-    competitors: [
-      { name: 'Competitor A', rating: 4.5 },
-      { name: 'Competitor B', rating: 3.9 }
+  const { query, location } = req.body || {};
+  if (!query || !location) {
+    return res.status(400).json({ error: "query + location required" });
+  }
+
+  const cacheKey = key({ query, location });
+  const cached = memoryCache.get(cacheKey);
+  if (cached && cached.exp > Date.now()) {
+    return res.json({ ...cached.val, cached: true });
+  }
+
+  const controller = new AbortController();
+  setTimeout(() => controller.abort(), 12000);
+
+  const dfs = await fetch(
+    "https://api.dataforseo.com/v3/serp/google/organic/live/advanced",
+    {
+      method: "POST",
+      headers: {
+        Authorization: auth(),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify([
+        {
+          keyword: `${query} ${location}`,
+          language_name: "English",
+          location_name: location,
+          depth: 10
+        }
+      ]),
+      signal: controller.signal
+    }
+  );
+
+  if (!dfs.ok) {
+    return res.status(502).json({ error: "DataForSEO failed" });
+  }
+
+  const json = await dfs.json();
+  const items =
+    json?.tasks?.[0]?.result?.[0]?.items?.filter((i: any) => i.type === "organic") || [];
+
+  const result = {
+    snapshot: {
+      location,
+      competitorsScanned: items.length,
+      opportunityScore: 90,
+      topMarketGap: "Missed leads due to weak visibility and slow response"
+    },
+    competitors: items.map((i: any) => ({
+      name: i.title,
+      domain: i.domain,
+      visibility: i.rank_group <= 3 ? "High" : "Low"
+    })),
+    pain_points: [
+      "After-hours leads are missed",
+      "Top search results capture most demand"
     ],
-    opportunityScore: 92,
-    message: 'Live scan endpoint active'
+    fix_plan: {
+      quickWins: ["Missed-call capture", "GBP optimization"],
+      momentum30: ["Local landing pages", "Review velocity"]
+    }
+  };
+
+  memoryCache.set(cacheKey, {
+    val: result,
+    exp: Date.now() + CACHE_TTL * 1000
   });
+
+  res.json(result);
 }
