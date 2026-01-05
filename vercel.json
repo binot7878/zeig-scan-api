@@ -1,10 +1,11 @@
 {
-  "buildCommand": null,
-  "devCommand": null,
-  "framework": null,
+  "version": 2,
   "functions": {
     "api/*.ts": {
       "runtime": "@vercel/node"
     }
-  }
+  },
+  "buildCommand": null,
+  "devCommand": null,
+  "framework": null
 }
