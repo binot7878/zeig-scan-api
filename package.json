@@ -1,8 +1,7 @@
-﻿{
+{
   "name": "zeig-scan-api",
   "version": "1.0.0",
   "private": true,
-  "type": "module",
   "scripts": {
     "build": "echo no build needed"
   }
