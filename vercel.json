@@ -1,11 +1,5 @@
 {
-  "version": 2,
-  "functions": {
-    "api/*.ts": {
-      "runtime": "@vercel/node@18"
-    }
-  },
+  "framework": null,
   "buildCommand": null,
-  "devCommand": null,
-  "framework": null
+  "devCommand": null
 }
