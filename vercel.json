@@ -1,5 +1,16 @@
 {
-  "framework": null,
-  "buildCommand": null,
-  "devCommand": null
+  "version": 2,
+  "builds": [
+    {
+      "src": "api/**/*.ts",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/$1"
+    }
+  ],
+  "outputDirectory": null
 }
